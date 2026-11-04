@@ -1,0 +1,47 @@
+name: Deploy Ubuntu Nginx with CloudFormation
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - cloudformation.yaml
+      - .github/workflows/deploy.yml
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    name: Validate and deploy infrastructure
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure temporary AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Confirm AWS identity
+        run: aws sts get-caller-identity
+
+      - name: Validate CloudFormation template
+        run: aws cloudformation validate-template --template-body file://cloudformation.yaml
+
+      - name: Create or update CloudFormation stack
+        run: |
+          aws cloudformation deploy \
+            --template-file cloudformation.yaml \
+            --stack-name bongodev-github-iac-dev \
+            --parameter-overrides Environment=dev \
+            --no-fail-on-empty-changeset
+
+      - name: Print outputs
+        run: |
+          aws cloudformation describe-stacks \
+            --stack-name bongodev-github-iac-dev \
+            --query "Stacks[0].Outputs" --output table
