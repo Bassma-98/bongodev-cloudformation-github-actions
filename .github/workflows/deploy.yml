@@ -7,10 +7,21 @@ on:
       - cloudformation.yaml
       - .github/workflows/deploy.yml
   workflow_dispatch:
+    inputs:
+      environment:
+        description: Environment to deploy
+        type: choice
+        options:
+          - dev
+          - test
+        default: dev
 
 permissions:
   id-token: write
   contents: read
+
+env:
+  ENVIRONMENT: ${{ inputs.environment || 'dev' }}
 
 jobs:
   deploy:
@@ -36,12 +47,12 @@ jobs:
         run: |
           aws cloudformation deploy \
             --template-file cloudformation.yaml \
-            --stack-name bongodev-github-iac-dev \
-            --parameter-overrides Environment=dev \
+            --stack-name "bongodev-github-iac-${ENVIRONMENT}" \
+            --parameter-overrides Environment="${ENVIRONMENT}" \
             --no-fail-on-empty-changeset
 
       - name: Print outputs
         run: |
           aws cloudformation describe-stacks \
-            --stack-name bongodev-github-iac-dev \
+            --stack-name "bongodev-github-iac-${ENVIRONMENT}" \
             --query "Stacks[0].Outputs" --output table
